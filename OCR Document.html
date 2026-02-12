@@ -1,0 +1,333 @@
+﻿<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Viewer with Accurate OCR</title>
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <!-- Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: Arial;
+        }
+
+        #textPanel {
+            width: 35%;
+            overflow-y: auto;
+            border-right: 1px solid #ccc;
+            padding: 10px;
+            background: #fafafa;
+        }
+
+        #pdfPanel {
+            width: 65%;
+            overflow-y: auto;
+            position: relative;
+            background: #eee;
+        }
+
+        .text-line {
+            cursor: pointer;
+            padding: 5px;
+            border-bottom: 1px dashed #ddd;
+        }
+
+            .text-line:hover {
+                background: #dbeafe;
+            }
+
+        .page {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .highlight {
+            position: absolute;
+            border: 2px solid red;
+            background: rgba(255, 0, 0, 0.25);
+            pointer-events: none;
+        }
+    </style>
+    <meta>
+    <meta>
+    <meta>
+    <meta>
+</head>
+
+<body style="overflow-wrap: break-word;" onload="OnLoad()">
+
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:flex-end; padding:10px; border-bottom:1px solid #ccc;">
+        <button onclick="refreshPage()"
+                style="padding:6px 14px; cursor:pointer;">
+            Refresh
+        </button>
+    </div>
+    <div id="textPanel">
+        <h3>Extracted Text</h3>
+    </div>
+
+    <div id="pdfPanel"></div>
+
+    <script>
+
+        function refreshPage() {
+            location.reload();
+        }
+
+        const SCALE = 2;
+
+        let pdfUrl = "./5a312567-5db9-f011-bbd3-7c1e521d650e_7d48cf8c-1bea-f011-8406-6045bd0e6caa_05012026113514.pdf";
+
+        // 🔴 Hardcoded JSON
+        const filterJson = [
+            { "Job no": "NJ22AOV" },
+            { "VEHICLE REG NO": "45800" },
+            { "Chasis REG NO": "UN03385735" },
+            { "Serial No": "10713439" },
+        ];
+
+        let filterValues = [];
+
+        const shownValues = new Set();
+        const pageWrappers = {};
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+        var _Xrm;
+        var _formContext;
+
+        async function OnLoad() { //Xrm, formContext) {
+            debugger;
+            try {
+                //if (Xrm != null && Xrm != undefined)
+                //    _Xrm = Xrm;
+                //else
+                //    _Xrm = window.parent.Xrm;
+
+                //if (formContext != null && formContext != undefined)
+                //    _formContext = formContext;
+                //else
+                //    _formContext = window.parent.Xrm.Page.ui.formContext;
+
+                //let filterJson = null;
+
+                //const attr = _formContext.getAttribute("ogre_document_key_values");
+
+                //if (attr) {
+                //    const value = attr.getValue();
+
+                //    if (value && value.trim() !== "") {
+                //        try {
+                //            filterJson = JSON.parse(value);
+                //        } catch (e) {
+                //            console.error("Invalid JSON in ogre_document_key_values field:", e);
+                //            return;
+                //        }
+                //    }
+                //}
+
+                //let recordId = _formContext.data.entity.getId();
+
+                //if (recordId) {
+                //    recordId = recordId.replace(/[{}]/g, "");
+                //}
+
+                // pdfUrl = `https://ogre-dev.crm11.dynamics.com/api/data/v9.0/ogre_ocrdocuments(${recordId})/ogre_file/$value`;
+
+                filterValues = filterJson.map(obj => {
+                    const key = Object.keys(obj)[0];
+                    const value = Object.values(obj)[0];
+
+                    return {
+                        key: key,
+                        value: value.toString().trim().toLowerCase()
+                    };
+                });
+
+                const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    await renderPage(page);
+                    await extractText(page);
+                }
+            } catch (e) {
+                SetStatus("Unknown problem occurred. Error: " + e);
+                console.log(e);
+            }
+        }
+
+        /* ================= RENDER PAGE ================= */
+
+        async function renderPage(page) {
+            const viewport = page.getViewport({ scale: SCALE });
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "page";
+            wrapper.appendChild(canvas);
+
+            document.getElementById("pdfPanel").appendChild(wrapper);
+            pageWrappers[page.pageNumber] = wrapper;
+
+            await page.render({ canvasContext: ctx, viewport }).promise;
+        }
+
+        /* ================= TEXT EXTRACTION ================= */
+
+        async function extractText(page) {
+            const viewport = page.getViewport({ scale: SCALE });
+            const textContent = await page.getTextContent();
+
+            if (textContent.items.length > 0) {
+                extractNormalPDFText(page, textContent, viewport);
+            } else {
+                await extractScannedPDFText(page);
+            }
+        }
+
+        /* ================= NORMAL PDF ================= */
+
+        function extractNormalPDFText(page, tc, viewport) {
+
+            tc.items.forEach(item => {
+
+                if (!item.str.trim()) return;
+
+                const pdfText = item.str.trim();
+                const normalizedPdfText = pdfText.toLowerCase();
+
+                // 🔴 JSON match check
+                const matchObj = filterValues.find(f => f.value === normalizedPdfText);
+                if (!matchObj) return;
+
+                // 🔴 Duplicate control
+                if (shownValues.has(matchObj.key)) return;
+                shownValues.add(matchObj.key);
+
+
+                const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                const left = tx[4];
+                const top = tx[5] - item.height * SCALE;
+                const width = item.width * SCALE;
+                const height = item.height * SCALE;
+
+                createTextLine(
+                    page.pageNumber,
+                    matchObj.key + " : " + pdfText,
+                    left,
+                    top,
+                    width,
+                    height
+                );
+
+            });
+        }
+
+        /* ================= OCR PDF ================= */
+
+        async function extractScannedPDFText(page) {
+
+            const canvas = pageWrappers[page.pageNumber].querySelector("canvas");
+            preprocessCanvas(canvas);
+
+            const worker = await Tesseract.createWorker("eng");
+            await worker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/-",
+                preserve_interword_spaces: "1"
+            });
+
+            const { data } = await worker.recognize(canvas);
+            await worker.terminate();
+
+            data.words.forEach(w => {
+
+                const pdfText = w.text.trim();
+                if (!pdfText) return;
+
+                const normalizedPdfText = pdfText.toLowerCase();
+
+                if (!filterValues.includes(normalizedPdfText)) return;
+
+                if (shownValues.has(normalizedPdfText)) return;
+                shownValues.add(normalizedPdfText);
+
+                createTextLine(
+                    page.pageNumber,
+                    pdfText,
+                    w.bbox.x0,
+                    w.bbox.y0,
+                    w.bbox.x1 - w.bbox.x0,
+                    w.bbox.y1 - w.bbox.y0
+                );
+            });
+        }
+
+        /* ================= IMAGE PREPROCESS ================= */
+
+        function preprocessCanvas(canvas) {
+
+            const ctx = canvas.getContext("2d");
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const d = imgData.data;
+
+            for (let i = 0; i < d.length; i += 4) {
+                const gray = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+                const val = gray > 160 ? 255 : 0;
+                d[i] = d[i + 1] = d[i + 2] = val;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        /* ================= UI ================= */
+
+        function createTextLine(page, text, left, top, width, height) {
+
+            const div = document.createElement("div");
+            div.className = "text-line";
+            div.textContent = text;
+
+            div.onclick = () => highlight(page, left, top, width, height);
+
+            document.getElementById("textPanel").appendChild(div);
+        }
+
+        function highlight(page, left, top, width, height) {
+
+            const wrapper = pageWrappers[page];
+
+            wrapper.querySelectorAll(".highlight").forEach(h => h.remove());
+
+            const h = document.createElement("div");
+            h.className = "highlight";
+
+            h.style.left = left + "px";
+            h.style.top = top + "px";
+            h.style.width = width + "px";
+            h.style.height = height + "px";
+
+            wrapper.appendChild(h);
+
+            h.scrollIntoView({ behavior: "smooth", block: "center" });
+        }</script>
+
+</body>
+</html>
