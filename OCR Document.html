@@ -63,7 +63,32 @@
         padding: 20px;
       }
 
-      /* Custom Scrollbar */
+      /* --- Skeleton Loading Styles --- */
+      .skeleton {
+        height: 35px;
+        margin-bottom: 10px;
+        background: #f1f5f9;
+        background: linear-gradient(
+          90deg,
+          #f1f5f9 25%,
+          #e2e8f0 50%,
+          #f1f5f9 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 5px;
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+
+      /* --- Existing UI Styles --- */
       #textPanel::-webkit-scrollbar,
       #pdfPanel::-webkit-scrollbar {
         width: 6px;
@@ -92,13 +117,11 @@
         outline: none;
       }
 
-      /* Edited state color */
       .text-line.is-edited {
         background: #fffbeb;
         border-color: #f59e0b;
         border-left: 4px solid #f59e0b;
       }
-
       .text-line:focus {
         background: #ffffff;
         border-color: #3b82f6;
@@ -165,6 +188,7 @@
     <div class="main-container">
       <div id="textPanel">
         <h3>Extracted Text</h3>
+        <div id="skeleton-container"></div>
       </div>
       <div id="pdfPanel"></div>
     </div>
@@ -195,9 +219,27 @@
       var _Xrm;
       var _formContext;
 
+      // Show skeletons on start
+      function showSkeletons() {
+        const container = document.getElementById("skeleton-container");
+        container.innerHTML = "";
+        for (let i = 0; i < 5; i++) {
+          const skel = document.createElement("div");
+          skel.className = "skeleton";
+          container.appendChild(skel);
+        }
+      }
+
+      // Hide skeletons
+      function hideSkeletons() {
+        const container = document.getElementById("skeleton-container");
+        if (container) container.style.display = "none";
+      }
+
       async function OnLoad() {
         //Xrm, formContext) {
         debugger;
+        showSkeletons(); // Start animation
         try {
           //if (Xrm != null && Xrm != undefined)
           //    _Xrm = Xrm;
@@ -246,7 +288,11 @@
             await renderPage(page);
             await extractText(page);
           }
+
+          // Hide skeletons after processing
+          hideSkeletons();
         } catch (e) {
+          hideSkeletons();
           // SetStatus("Unknown problem occurred. Error: " + e);
           console.log(e);
         }
