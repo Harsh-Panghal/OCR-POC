@@ -63,11 +63,10 @@
         padding: 20px;
       }
 
-      /* --- Skeleton Loading Styles --- */
+      /* Skeleton Animation */
       .skeleton {
         height: 35px;
         margin-bottom: 10px;
-        background: #f1f5f9;
         background: linear-gradient(
           90deg,
           #f1f5f9 25%,
@@ -78,7 +77,6 @@
         animation: shimmer 1.5s infinite;
         border-radius: 5px;
       }
-
       @keyframes shimmer {
         0% {
           background-position: 200% 0;
@@ -88,7 +86,53 @@
         }
       }
 
-      /* --- Existing UI Styles --- */
+      /* Toast Styling */
+      #toast {
+        visibility: hidden;
+        min-width: 250px;
+        background-color: #10b981;
+        color: #fff;
+        text-align: center;
+        border-radius: 8px;
+        padding: 16px;
+        position: fixed;
+        z-index: 100;
+        right: 30px;
+        bottom: 30px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      }
+
+      #toast.show {
+        visibility: visible;
+        animation:
+          fadein 0.5s,
+          fadeout 0.5s 2.5s;
+      }
+
+      @keyframes fadein {
+        from {
+          bottom: 0;
+          opacity: 0;
+        }
+        to {
+          bottom: 30px;
+          opacity: 1;
+        }
+      }
+      @keyframes fadeout {
+        from {
+          bottom: 30px;
+          opacity: 1;
+        }
+        to {
+          bottom: 0;
+          opacity: 0;
+        }
+      }
+
+      /* Scrollbars */
       #textPanel::-webkit-scrollbar,
       #pdfPanel::-webkit-scrollbar {
         width: 6px;
@@ -193,6 +237,8 @@
       <div id="pdfPanel"></div>
     </div>
 
+    <div id="toast">Changes Saved Successfully!</div>
+
     <script>
       function refreshPage() {
         location.reload();
@@ -219,7 +265,6 @@
       var _Xrm;
       var _formContext;
 
-      // Show skeletons on start
       function showSkeletons() {
         const container = document.getElementById("skeleton-container");
         container.innerHTML = "";
@@ -230,16 +275,23 @@
         }
       }
 
-      // Hide skeletons
       function hideSkeletons() {
         const container = document.getElementById("skeleton-container");
         if (container) container.style.display = "none";
       }
 
+      function showToast() {
+        const x = document.getElementById("toast");
+        x.className = "show";
+        setTimeout(function () {
+          x.className = x.className.replace("show", "");
+        }, 3000);
+      }
+
       async function OnLoad() {
         //Xrm, formContext) {
         debugger;
-        showSkeletons(); // Start animation
+        showSkeletons();
         try {
           //if (Xrm != null && Xrm != undefined)
           //    _Xrm = Xrm;
@@ -288,12 +340,9 @@
             await renderPage(page);
             await extractText(page);
           }
-
-          // Hide skeletons after processing
           hideSkeletons();
         } catch (e) {
           hideSkeletons();
-          // SetStatus("Unknown problem occurred. Error: " + e);
           console.log(e);
         }
       }
@@ -315,11 +364,9 @@
       async function extractText(page) {
         const viewport = page.getViewport({ scale: SCALE });
         const textContent = await page.getTextContent();
-        if (textContent.items.length > 0) {
+        if (textContent.items.length > 0)
           extractNormalPDFText(page, textContent, viewport);
-        } else {
-          await extractScannedPDFText(page);
-        }
+        else await extractScannedPDFText(page);
       }
 
       function extractNormalPDFText(page, tc, viewport) {
@@ -330,8 +377,7 @@
           const matchObj = filterValues.find(
             (f) => f.value === normalizedPdfText,
           );
-          if (!matchObj) return;
-          if (shownValues.has(matchObj.key)) return;
+          if (!matchObj || shownValues.has(matchObj.key)) return;
           shownValues.add(matchObj.key);
           const tx = pdfjsLib.Util.transform(
             viewport.transform,
@@ -363,13 +409,11 @@
         await worker.terminate();
         data.words.forEach((w) => {
           const pdfText = w.text.trim();
-          if (!pdfText) return;
           const normalizedPdfText = pdfText.toLowerCase();
           const matchObj = filterValues.find(
             (f) => f.value === normalizedPdfText,
           );
-          if (!matchObj) return;
-          if (shownValues.has(matchObj.key)) return;
+          if (!matchObj || shownValues.has(matchObj.key)) return;
           shownValues.add(matchObj.key);
           createTextLine(
             page.pageNumber,
@@ -403,9 +447,8 @@
         div.contentEditable = "true";
         div.innerHTML = `<strong>${key}:</strong> <span class="val-content">${value}</span>`;
         div.onclick = (e) => {
-          if (e.target === div || e.target.tagName === "STRONG") {
+          if (e.target === div || e.target.tagName === "STRONG")
             highlight(page, left, top, width, height);
-          }
         };
         div.oninput = () => {
           const currentVal = div.querySelector(".val-content").innerText.trim();
@@ -427,12 +470,12 @@
         document.querySelectorAll(".text-line").forEach((div) => {
           const key = div.getAttribute("data-key");
           const value = div.querySelector(".val-content").innerText.trim();
-          const obj = {};
-          obj[key] = value;
-          updatedData.push(obj);
+          updatedData.push({ [key]: value });
         });
-        console.log("Updated JSON Data:", JSON.stringify(updatedData, null, 2));
-        alert("Changes saved to console!");
+        console.log("Updated JSON:", JSON.stringify(updatedData));
+
+        showToast(); // Success toast instead of alert
+
         document.querySelectorAll(".is-edited").forEach((el) => {
           el.setAttribute(
             "data-original",
