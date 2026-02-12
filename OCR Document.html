@@ -4,7 +4,6 @@
     <title>PDF Viewer with Accurate OCR</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
@@ -36,8 +35,8 @@
       }
 
       #textPanel {
-        width: 260px;
-        min-width: 260px;
+        width: 280px; /* Slightly wider for better field visibility */
+        min-width: 280px;
         overflow-y: auto;
         border-right: 1px solid #d1d5db;
         padding: 15px;
@@ -50,6 +49,7 @@
         color: #1e40af;
         border-bottom: 2px solid #3b82f6;
         padding-bottom: 8px;
+        margin-bottom: 15px;
       }
 
       #pdfPanel {
@@ -65,8 +65,8 @@
 
       /* Skeleton Animation */
       .skeleton {
-        height: 35px;
-        margin-bottom: 10px;
+        height: 40px;
+        margin-bottom: 12px;
         background: linear-gradient(
           90deg,
           #f1f5f9 25%,
@@ -75,7 +75,7 @@
         );
         background-size: 200% 100%;
         animation: shimmer 1.5s infinite;
-        border-radius: 5px;
+        border-radius: 6px;
       }
       @keyframes shimmer {
         0% {
@@ -101,16 +101,14 @@
         bottom: 30px;
         font-size: 14px;
         font-weight: 600;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
       }
-
       #toast.show {
         visibility: visible;
         animation:
           fadein 0.5s,
           fadeout 0.5s 2.5s;
       }
-
       @keyframes fadein {
         from {
           bottom: 0;
@@ -132,7 +130,7 @@
         }
       }
 
-      /* Scrollbars */
+      /* Improved Scrollbars */
       #textPanel::-webkit-scrollbar,
       #pdfPanel::-webkit-scrollbar {
         width: 6px;
@@ -150,31 +148,60 @@
       }
 
       .text-line {
-        cursor: pointer;
-        padding: 8px 10px;
-        margin-bottom: 8px;
-        background: #f8fafc;
+        padding: 10px;
+        margin-bottom: 15px;
+        background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 5px;
-        font-size: 12px;
+        border-radius: 8px;
+        font-size: 13px;
         transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column; /* Label upar, Value niche */
+        gap: 6px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      }
+
+      .text-line strong {
+        color: #64748b; /* Subtle color for label */
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        pointer-events: none; /* Label click logic handling through parent */
+      }
+
+      /* Editable Value - Full Width Block */
+      .val-content {
+        display: block;
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #f1f5f9;
         outline: none;
+        transition: all 0.2s;
+        word-break: break-all;
+        background: #f8fafc;
+        box-sizing: border-box;
+        color: #1e293b;
+        font-weight: 500;
+      }
+
+      /* Focus effect - Area feels larger */
+      .val-content:focus {
+        background: #ffffff;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
       }
 
       .text-line.is-edited {
-        background: #fffbeb;
-        border-color: #f59e0b;
         border-left: 4px solid #f59e0b;
-      }
-      .text-line:focus {
-        background: #ffffff;
-        border-color: #3b82f6;
+        background: #fffbeb;
       }
 
       .page {
         position: relative;
         margin-bottom: 25px;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         background: white;
       }
 
@@ -187,21 +214,25 @@
         border: 2px solid #3b82f6;
         background: rgba(59, 130, 246, 0.25);
         pointer-events: none;
+        border-radius: 2px;
       }
 
       .btn-refresh,
       .btn-save {
-        padding: 6px 14px;
+        padding: 8px 16px;
         cursor: pointer;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         font-size: 12px;
         font-weight: 600;
+        transition: 0.2s;
       }
-
       .btn-refresh {
-        background: #e5e7eb;
-        color: #374151;
+        background: #f1f5f9;
+        color: #475569;
+      }
+      .btn-refresh:hover {
+        background: #e2e8f0;
       }
       .btn-save {
         background: #10b981;
@@ -209,17 +240,21 @@
         margin-left: 8px;
       }
       .btn-save:disabled {
-        background: #d1d5db;
-        color: #9ca3af;
+        background: #cbd5e1;
+        color: #94a3b8;
         cursor: not-allowed;
+      }
+      .btn-save:not(:disabled):hover {
+        background: #059669;
+        transform: translateY(-1px);
       }
     </style>
   </head>
 
-  <body style="overflow-wrap: break-word" onload="OnLoad()">
+  <body onload="OnLoad()">
     <div class="top-bar">
-      <div style="font-size: 13px; font-weight: 600; color: #64748b">
-        OCR PDF VIEWER
+      <div style="font-size: 14px; font-weight: 700; color: #1e40af">
+        OGRE OCR VIEWER
       </div>
       <div>
         <button class="btn-refresh" onclick="refreshPage()">Refresh</button>
@@ -268,7 +303,7 @@
       function showSkeletons() {
         const container = document.getElementById("skeleton-container");
         container.innerHTML = "";
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           const skel = document.createElement("div");
           skel.className = "skeleton";
           container.appendChild(skel);
@@ -289,7 +324,6 @@
       }
 
       async function OnLoad() {
-        //Xrm, formContext) {
         debugger;
         showSkeletons();
         try {
@@ -327,7 +361,6 @@
           //}
 
           // pdfUrl = `https://ogre-dev.crm11.dynamics.com/api/data/v9.0/ogre_ocrdocuments(${recordId})/ogre_file/$value`;
-
           filterValues = filterJson.map((obj) => {
             const key = Object.keys(obj)[0];
             const value = Object.values(obj)[0];
@@ -444,19 +477,30 @@
         div.className = "text-line";
         div.setAttribute("data-key", key);
         div.setAttribute("data-original", value);
-        div.contentEditable = "true";
-        div.innerHTML = `<strong>${key}:</strong> <span class="val-content">${value}</span>`;
+
+        // Label on Top, Editable Value on Bottom
+        div.innerHTML = `<strong>${key}</strong> 
+                     <span class="val-content" contenteditable="true" spellcheck="false">${value}</span>`;
+
+        // Parent click redirects to child focus
         div.onclick = (e) => {
-          if (e.target === div || e.target.tagName === "STRONG")
-            highlight(page, left, top, width, height);
+          const span = div.querySelector(".val-content");
+          if (document.activeElement !== span) {
+            span.focus();
+          }
+          highlight(page, left, top, width, height);
         };
-        div.oninput = () => {
-          const currentVal = div.querySelector(".val-content").innerText.trim();
+
+        const span = div.querySelector(".val-content");
+
+        span.oninput = () => {
+          const currentVal = span.innerText.trim();
           const originalVal = div.getAttribute("data-original").trim();
           if (currentVal !== originalVal) div.classList.add("is-edited");
           else div.classList.remove("is-edited");
           checkEnableSave();
         };
+
         document.getElementById("textPanel").appendChild(div);
       }
 
@@ -473,9 +517,7 @@
           updatedData.push({ [key]: value });
         });
         console.log("Updated JSON:", JSON.stringify(updatedData));
-
-        showToast(); // Success toast instead of alert
-
+        showToast();
         document.querySelectorAll(".is-edited").forEach((el) => {
           el.setAttribute(
             "data-original",
