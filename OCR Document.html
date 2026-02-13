@@ -150,10 +150,13 @@
 
       /* --- Vertical Layout Field --- */
       .text-line {
-        padding: 10px 10px 14px 10px; /* Bottom padding to fit progress bar */
+        padding: 10px 10px 14px 10px;
         margin-bottom: 15px;
         background: #ffffff;
         border: 1px solid #e2e8f0;
+        /* Yahan left border ko thoda thick kar diya hai */
+        border-left-width: 5px;
+        border-left-style: solid;
         border-radius: 8px;
         font-size: 13px;
         transition: all 0.2s ease;
@@ -163,8 +166,19 @@
         cursor: pointer;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
         position: relative;
-        overflow: hidden; /* For progress bar border-radius */
+        overflow: hidden;
       }
+
+      /* Confidence Colors applied directly to left border */
+      .text-line.conf-high {
+        border-left-color: #10b981;
+      } /* Green */
+      .text-line.conf-medium {
+        border-left-color: #f59e0b;
+      } /* Yellow */
+      .text-line.conf-low {
+        border-left-color: #ef4444;
+      } /* Red */
 
       .text-line strong {
         color: #64748b;
@@ -196,32 +210,17 @@
         box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
       }
 
+      /* Edited State - Doesn't override the left border */
       .text-line.is-edited {
-        border-left: 4px solid #6366f1; /* Indigo border */
-        background: #eef2ff; /* Very light indigo background */
+        background: #eef2ff;
+        border-top-color: #6366f1;
+        border-right-color: #6366f1;
+        border-bottom-color: #6366f1;
       }
 
       .text-line.is-edited .val-content {
         border-color: #c7d2fe;
       }
-
-      /* --- Confidence Progress Bar --- */
-      .confidence-bar {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        height: 4px;
-        transition: width 0.3s ease;
-      }
-      .conf-high {
-        background-color: #10b981;
-      } /* Green */
-      .conf-medium {
-        background-color: #f59e0b;
-      } /* Yellow */
-      .conf-low {
-        background-color: #ef4444;
-      } /* Red */
 
       /* --- PDF Area --- */
       .page {
@@ -540,25 +539,25 @@
         height,
       ) {
         const div = document.createElement("div");
-        div.className = "text-line";
-        div.setAttribute("data-key", key);
-        div.setAttribute("data-original", value);
-        div.setAttribute("data-confidence", confidence);
 
-        // Progress Bar Logic
+        // Progress Bar Logic ki jagah direct class logic
         let colorClass = "conf-high";
         if (confidence < 0.5) {
           colorClass = "conf-low";
         } else if (confidence < 0.8) {
           colorClass = "conf-medium";
         }
-        const widthPercent = confidence * 100 + "%";
 
-        // Inject HTML
+        // Parent div ko hi text-line aur confidence color de diya
+        div.className = `text-line ${colorClass}`;
+        div.setAttribute("data-key", key);
+        div.setAttribute("data-original", value);
+        div.setAttribute("data-confidence", confidence);
+
+        // Inject HTML (Removed the extra confidence-bar div)
         div.innerHTML = `
           <strong>${key}</strong> 
           <span class="val-content" contenteditable="true" spellcheck="false">${value}</span>
-          <div class="confidence-bar ${colorClass}" style="width: ${widthPercent};" title="Confidence: ${widthPercent}"></div>
         `;
 
         // Unified Click & Focus
