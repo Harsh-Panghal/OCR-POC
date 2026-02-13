@@ -4,6 +4,7 @@
     <title>PDF Viewer with Accurate OCR</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
@@ -35,7 +36,7 @@
       }
 
       #textPanel {
-        width: 280px; /* Slightly wider for better field visibility */
+        width: 280px;
         min-width: 280px;
         overflow-y: auto;
         border-right: 1px solid #d1d5db;
@@ -63,7 +64,7 @@
         padding: 20px;
       }
 
-      /* Skeleton Animation */
+      /* --- Skeleton Animation --- */
       .skeleton {
         height: 40px;
         margin-bottom: 12px;
@@ -86,7 +87,7 @@
         }
       }
 
-      /* Toast Styling */
+      /* --- Toast Styling --- */
       #toast {
         visibility: hidden;
         min-width: 250px;
@@ -130,7 +131,7 @@
         }
       }
 
-      /* Improved Scrollbars */
+      /* --- Improved Scrollbars --- */
       #textPanel::-webkit-scrollbar,
       #pdfPanel::-webkit-scrollbar {
         width: 6px;
@@ -147,8 +148,9 @@
         background: rgba(255, 255, 255, 0.2);
       }
 
+      /* --- Vertical Layout Field --- */
       .text-line {
-        padding: 10px;
+        padding: 10px 10px 14px 10px; /* Bottom padding to fit progress bar */
         margin-bottom: 15px;
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -156,21 +158,23 @@
         font-size: 13px;
         transition: all 0.2s ease;
         display: flex;
-        flex-direction: column; /* Label upar, Value niche */
+        flex-direction: column;
         gap: 6px;
         cursor: pointer;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        position: relative;
+        overflow: hidden; /* For progress bar border-radius */
       }
 
       .text-line strong {
-        color: #64748b; /* Subtle color for label */
+        color: #64748b;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        pointer-events: none; /* Label click logic handling through parent */
+        pointer-events: none;
       }
 
-      /* Editable Value - Full Width Block */
+      /* Editable Value Box */
       .val-content {
         display: block;
         width: 100%;
@@ -186,7 +190,6 @@
         font-weight: 500;
       }
 
-      /* Focus effect - Area feels larger */
       .val-content:focus {
         background: #ffffff;
         border-color: #3b82f6;
@@ -194,10 +197,33 @@
       }
 
       .text-line.is-edited {
-        border-left: 4px solid #f59e0b;
-        background: #fffbeb;
+        border-left: 4px solid #6366f1; /* Indigo border */
+        background: #eef2ff; /* Very light indigo background */
       }
 
+      .text-line.is-edited .val-content {
+        border-color: #c7d2fe;
+      }
+
+      /* --- Confidence Progress Bar --- */
+      .confidence-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 4px;
+        transition: width 0.3s ease;
+      }
+      .conf-high {
+        background-color: #10b981;
+      } /* Green */
+      .conf-medium {
+        background-color: #f59e0b;
+      } /* Yellow */
+      .conf-low {
+        background-color: #ef4444;
+      } /* Red */
+
+      /* --- PDF Area --- */
       .page {
         position: relative;
         margin-bottom: 25px;
@@ -217,6 +243,7 @@
         border-radius: 2px;
       }
 
+      /* --- Buttons --- */
       .btn-refresh,
       .btn-save {
         padding: 8px 16px;
@@ -283,11 +310,12 @@
       let pdfUrl =
         "./5a312567-5db9-f011-bbd3-7c1e521d650e_7d48cf8c-1bea-f011-8406-6045bd0e6caa_05012026113514.pdf";
 
+      // Include dummy confidence values for UI demonstration
       const filterJson = [
-        { "Job no": "NJ22AOV" },
-        { "VEHICLE REG NO": "45800" },
-        { "Chasis REG NO": "UN03385735" },
-        { "Serial No": "10713439" },
+        { "Job no": "NJ22AOV", confidence: 0.95 },
+        { "VEHICLE REG NO": "45800", confidence: 0.65 },
+        { "Chasis REG NO": "UN03385735", confidence: 0.4 },
+        { "Serial No": "10713439", confidence: 0.88 },
       ];
 
       let filterValues = [];
@@ -300,6 +328,7 @@
       var _Xrm;
       var _formContext;
 
+      // Skeleton UI Functions
       function showSkeletons() {
         const container = document.getElementById("skeleton-container");
         container.innerHTML = "";
@@ -315,6 +344,7 @@
         if (container) container.style.display = "none";
       }
 
+      // Toast Notification Function
       function showToast() {
         const x = document.getElementById("toast");
         x.className = "show";
@@ -323,7 +353,20 @@
         }, 3000);
       }
 
+      // Clear all highlights globally
+      function removeHighlights() {
+        document.querySelectorAll(".highlight").forEach((h) => h.remove());
+      }
+
+      // Clear highlights when clicking empty PDF space
+      document.getElementById("pdfPanel").addEventListener("click", (e) => {
+        if (e.target.id === "pdfPanel" || e.target.className === "page") {
+          removeHighlights();
+        }
+      });
+
       async function OnLoad() {
+        //Xrm, formContext) {
         debugger;
         showSkeletons();
         try {
@@ -361,10 +404,16 @@
           //}
 
           // pdfUrl = `https://ogre-dev.crm11.dynamics.com/api/data/v9.0/ogre_ocrdocuments(${recordId})/ogre_file/$value`;
+
           filterValues = filterJson.map((obj) => {
             const key = Object.keys(obj)[0];
             const value = Object.values(obj)[0];
-            return { key: key, value: value.toString().trim().toLowerCase() };
+            const conf = obj.confidence || 1.0;
+            return {
+              key: key,
+              value: value.toString().trim().toLowerCase(),
+              confidence: conf,
+            };
           });
 
           const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
@@ -376,6 +425,7 @@
           hideSkeletons();
         } catch (e) {
           hideSkeletons();
+          // SetStatus("Unknown problem occurred. Error: " + e);
           console.log(e);
         }
       }
@@ -410,16 +460,20 @@
           const matchObj = filterValues.find(
             (f) => f.value === normalizedPdfText,
           );
+
           if (!matchObj || shownValues.has(matchObj.key)) return;
           shownValues.add(matchObj.key);
+
           const tx = pdfjsLib.Util.transform(
             viewport.transform,
             item.transform,
           );
+
           createTextLine(
             page.pageNumber,
             matchObj.key,
             pdfText,
+            matchObj.confidence,
             tx[4],
             tx[5] - item.height * SCALE,
             item.width * SCALE,
@@ -446,12 +500,15 @@
           const matchObj = filterValues.find(
             (f) => f.value === normalizedPdfText,
           );
+
           if (!matchObj || shownValues.has(matchObj.key)) return;
           shownValues.add(matchObj.key);
+
           createTextLine(
             page.pageNumber,
             matchObj.key,
             pdfText,
+            matchObj.confidence,
             w.bbox.x0,
             w.bbox.y0,
             w.bbox.x1 - w.bbox.x0,
@@ -472,17 +529,39 @@
         ctx.putImageData(imgData, 0, 0);
       }
 
-      function createTextLine(page, key, value, left, top, width, height) {
+      function createTextLine(
+        page,
+        key,
+        value,
+        confidence,
+        left,
+        top,
+        width,
+        height,
+      ) {
         const div = document.createElement("div");
         div.className = "text-line";
         div.setAttribute("data-key", key);
         div.setAttribute("data-original", value);
+        div.setAttribute("data-confidence", confidence);
 
-        // Label on Top, Editable Value on Bottom
-        div.innerHTML = `<strong>${key}</strong> 
-                     <span class="val-content" contenteditable="true" spellcheck="false">${value}</span>`;
+        // Progress Bar Logic
+        let colorClass = "conf-high";
+        if (confidence < 0.5) {
+          colorClass = "conf-low";
+        } else if (confidence < 0.8) {
+          colorClass = "conf-medium";
+        }
+        const widthPercent = confidence * 100 + "%";
 
-        // Parent click redirects to child focus
+        // Inject HTML
+        div.innerHTML = `
+          <strong>${key}</strong> 
+          <span class="val-content" contenteditable="true" spellcheck="false">${value}</span>
+          <div class="confidence-bar ${colorClass}" style="width: ${widthPercent};" title="Confidence: ${widthPercent}"></div>
+        `;
+
+        // Unified Click & Focus
         div.onclick = (e) => {
           const span = div.querySelector(".val-content");
           if (document.activeElement !== span) {
@@ -493,6 +572,7 @@
 
         const span = div.querySelector(".val-content");
 
+        // Input monitoring
         span.oninput = () => {
           const currentVal = span.innerText.trim();
           const originalVal = div.getAttribute("data-original").trim();
@@ -511,13 +591,25 @@
 
       function handleSave() {
         const updatedData = [];
+
         document.querySelectorAll(".text-line").forEach((div) => {
           const key = div.getAttribute("data-key");
           const value = div.querySelector(".val-content").innerText.trim();
-          updatedData.push({ [key]: value });
+          const confidence = parseFloat(div.getAttribute("data-confidence"));
+
+          // Reconstruct the array of objects structure
+          updatedData.push({
+            [key]: value,
+            confidence: confidence,
+          });
         });
-        console.log("Updated JSON:", JSON.stringify(updatedData));
+
+        console.log("Updated JSON:", JSON.stringify(updatedData, null, 2));
+
+        // Show success notification
         showToast();
+
+        // Reset state after save
         document.querySelectorAll(".is-edited").forEach((el) => {
           el.setAttribute(
             "data-original",
@@ -525,18 +617,22 @@
           );
           el.classList.remove("is-edited");
         });
+
         checkEnableSave();
       }
 
       function highlight(page, left, top, width, height) {
         const wrapper = pageWrappers[page];
-        wrapper.querySelectorAll(".highlight").forEach((h) => h.remove());
+
+        removeHighlights();
+
         const h = document.createElement("div");
         h.className = "highlight";
         h.style.left = left + "px";
         h.style.top = top + "px";
         h.style.width = width + "px";
         h.style.height = height + "px";
+
         wrapper.appendChild(h);
         h.scrollIntoView({ behavior: "smooth", block: "center" });
       }
