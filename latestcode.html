@@ -56,12 +56,19 @@
       #pdfPanel {
         flex-grow: 1;
         overflow-y: auto;
+        overflow-x: auto;
         position: relative;
         background: #525659;
         display: flex;
         flex-direction: column;
         align-items: center;
         padding: 20px;
+        cursor: grab;
+      }
+
+      #pdfPanel.is-dragging {
+        cursor: grabbing;
+        user-select: none; /* Drag karte waqt text select na ho */
       }
 
       /* --- Skeleton Animation --- */
@@ -332,24 +339,30 @@
         top: 4px;
         right: 8px;
         color: #94a3b8;
-        cursor: help;
+        cursor: pointer; /* 'help' se 'pointer' kar diya kyunki ab clickable hai */
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        height: 16px;
+        width: 22px; /* Size increase kiya (Pehle 16px tha) */
+        height: 22px; /* Size increase kiya */
+        border-radius: 50%;
+        transition:
+          background-color 0.2s,
+          color 0.2s;
       }
 
       .info-icon:hover {
-        color: #3b82f6; /* Blue on hover */
+        color: #3b82f6;
+        background-color: #f1f5f9; /* Hover par halka background for better feel */
       }
 
       .info-icon svg {
-        width: 14px;
-        height: 14px;
+        width: 18px; /* SVG icon bhi bada kiya (Pehle 14px tha) */
+        height: 18px;
         fill: currentColor;
       }
 
+      /* Tooltip base style same rahegi */
       .tooltip-text {
         visibility: hidden;
         width: max-content;
@@ -362,40 +375,31 @@
         font-size: 11px;
         font-weight: 500;
         line-height: 1.4;
-        text-transform: none;
-        letter-spacing: normal;
-
-        /* Positioning */
         position: absolute;
         z-index: 150;
         bottom: 130%;
-        right: -5px; /* Aligned to the right edge */
-
+        right: -5px;
         opacity: 0;
         transition:
           opacity 0.2s ease,
           transform 0.2s ease;
         transform: translateY(5px);
-        box-shadow:
-          0 4px 6px -1px rgba(0, 0, 0, 0.1),
-          0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        pointer-events: none; /* Clicking passes through */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       }
 
-      /* Tooltip Arrow */
       .tooltip-text::after {
         content: "";
         position: absolute;
         top: 100%;
-        right: 10px; /* Align arrow with the icon */
+        right: 12px; /* Arrow alignment adjust kiya naye size ke hisaab se */
         margin-left: -5px;
         border-width: 5px;
         border-style: solid;
         border-color: #1e293b transparent transparent transparent;
       }
 
-      /* Hover par tooltip dikhega */
-      .info-icon:hover .tooltip-text {
+      /* --- NEW: Click par ye class add hogi JS ke through --- */
+      .tooltip-text.show {
         visibility: visible;
         opacity: 1;
         transform: translateY(0);
@@ -426,6 +430,19 @@
         <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
         <span id="zoomVal">100%</span>
         <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+
+        <div
+          style="width: 1px; height: 16px; background: #475569; margin: 0 4px"
+        ></div>
+
+        <button
+          class="zoom-btn"
+          onclick="resetZoom()"
+          title="Reset Zoom"
+          style="font-size: 16px"
+        >
+          ↺
+        </button>
       </div>
 
       <div id="pdfPanel">
@@ -481,7 +498,7 @@
             "The unique 17-character Vehicle Identification Number (VIN).",
         },
         {
-          "Type": "Goods",
+          Type: "Goods",
           confidence: 0.42,
           description: "The type of vehicle or cargo being transported.",
         },
@@ -607,7 +624,7 @@
         }
       }
 
-      // --- NEW: Zoom Logic ---
+      // --- Zoom Logic ---
       let currentZoom = 1.0;
 
       function zoomIn() {
@@ -622,6 +639,15 @@
         if (currentZoom > 0.5) {
           // Min zoom 50%
           currentZoom -= 0.1;
+          applyZoom();
+        }
+      }
+
+      // --- Reset Zoom Logic ---
+      function resetZoom() {
+        if (currentZoom !== 1.0) {
+          // Agar pehle se 100% nahi hai tabhi chalega
+          currentZoom = 1.0;
           applyZoom();
         }
       }
@@ -768,7 +794,7 @@
         let infoHtml = "";
         if (description) {
           infoHtml = `
-            <div class="info-icon">
+            <div class="info-icon" onclick="toggleTooltip(event, this)">
               <svg viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
               </svg>
@@ -857,6 +883,83 @@
         wrapper.appendChild(h);
         h.scrollIntoView({ behavior: "smooth", block: "center" });
       }
+
+      // --- Tooltip Click Logic ---
+
+      // Icon par click karne se kya hoga
+      function toggleTooltip(event, element) {
+        // Event ko parent (text-line) tak jaane se rokta hai, warna PDF highlight trigger ho jayega
+        event.stopPropagation();
+
+        const tooltip = element.querySelector(".tooltip-text");
+        const isAlreadyVisible = tooltip.classList.contains("show");
+
+        // Pehle saare open tooltips ko band karo
+        document.querySelectorAll(".tooltip-text.show").forEach((el) => {
+          el.classList.remove("show");
+        });
+
+        // Agar clicked tooltip band tha, to use khol do
+        if (!isAlreadyVisible) {
+          tooltip.classList.add("show");
+        }
+      }
+
+      // Kahi aur click karne par saare tooltips band ho jayenge
+      document.addEventListener("click", function () {
+        document.querySelectorAll(".tooltip-text.show").forEach((el) => {
+          el.classList.remove("show");
+        });
+      });
+
+      // --- Drag to Pan (Scroll) Logic ---
+      const pdfPanel = document.getElementById("pdfPanel");
+      let isDragging = false;
+      let startX, startY, scrollLeft, scrollTop;
+
+      // Jab mouse button press ho
+      pdfPanel.addEventListener("mousedown", (e) => {
+        // Agar zoom toolbar ke buttons pe click kiya hai toh drag start mat karo
+        if (e.target.closest(".zoom-toolbar")) return;
+
+        isDragging = true;
+        pdfPanel.classList.add("is-dragging");
+
+        // Initial positions record karo
+        startX = e.pageX - pdfPanel.offsetLeft;
+        startY = e.pageY - pdfPanel.offsetTop;
+        scrollLeft = pdfPanel.scrollLeft;
+        scrollTop = pdfPanel.scrollTop;
+      });
+
+      // Jab mouse leave kare ya button chhod de
+      pdfPanel.addEventListener("mouseleave", () => {
+        isDragging = false;
+        pdfPanel.classList.remove("is-dragging");
+      });
+
+      pdfPanel.addEventListener("mouseup", () => {
+        isDragging = false;
+        pdfPanel.classList.remove("is-dragging");
+      });
+
+      // Jab mouse move kare
+      pdfPanel.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+
+        e.preventDefault(); // Default behaviour roko (jaise text selection)
+
+        const x = e.pageX - pdfPanel.offsetLeft;
+        const y = e.pageY - pdfPanel.offsetTop;
+
+        // Kitna move karna hai (1.5 multiplier thoda fast pan karne ke liye hai)
+        const walkX = (x - startX) * 1.5;
+        const walkY = (y - startY) * 1.5;
+
+        // Scroll position update karo
+        pdfPanel.scrollLeft = scrollLeft - walkX;
+        pdfPanel.scrollTop = scrollTop - walkY;
+      });
     </script>
   </body>
 </html>
